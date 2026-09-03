@@ -1,5 +1,5 @@
 # Cenário: Sistema de biblioteca comunitária
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
 import sqlite3
 
@@ -33,11 +33,58 @@ connection.close()
 # Instanciando o objeto "app" à classe FastAPI()
 app = FastAPI()
 
+# Essa classe Livro pega o JSON e valida os dados, sendo cada atributo um tipo de filtro
 class Livro(BaseModel):
-    nome: str
+    titulo: str
     autor:str
     paginas: int
 
-@app.post("/livros/")
+@app.post("/livros/", status_code=status.HTTP_200_OK) # O create do CRUD
 def criar_livros(livro_recebido: Livro):
+
     commandSQL = "INSERT INTO livros (titulo, autor, paginas) VALUES (?, ?, ?);"
+    dados = (livro_recebido.titulo, livro_recebido.autor, livro_recebido.paginas)
+
+    # Abre conexão
+    connection = sqlite3.connect("biblioteca.db")
+
+    # Cria o cursor
+    cursor = connection.cursor()
+
+    # Executa o comando
+    cursor.execute(commandSQL, dados)
+
+    # commit() para salvar
+    connection.commit()
+
+    # Fecha o cursor e conexão
+    cursor.close()
+    connection.close()
+
+    # Retorna um JSON
+    return {"mensagem": "Livro criado com todo sucesso do mundo!"}
+
+
+@app.get("/livros/", status_code=status.HTTP_200_OK)
+def obter_livros():
+    # Abre conexão
+    connection = sqlite3.connect("biblioteca.db")
+
+    # Cria o cursor
+    cursor = connection.cursor()
+
+    # Executa o comando
+    cursor.execute("SELECT id, titulo, autor, paginas FROM livros;")
+
+    # Guarda resultado em uma variável
+    livros_obtidos: list = cursor.fetchall()
+
+    # Fecha o cursor e conexão
+    cursor.close()
+    connection.close()
+
+    # Retorna um JSON
+    return {
+        "mensagem": "Livros obtidos com todo o sucesso do mundo!",
+        "dados": livros_obtidos
+}
