@@ -12,7 +12,7 @@ print(caso1)
 
 # Tipos de dados
 
-class UsuarioCadastro(BaseModel):
+class UsuarioCadastro(BaseModel): # O BaseModel ja faz o método __init__ e ainda valida dados e converte dict para JSON e vice-versa
     # Campos obrigatórios com tipos primitivos e especiais
     nome: str
     idade: int
