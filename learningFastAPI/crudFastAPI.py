@@ -40,7 +40,7 @@ class Livro(BaseModel):
     paginas: int
 
 class AtualizarPaginas(BaseModel): # Exclusivo do Patch
-    paginas: int  # O campo que o usuário vai enviar no JSON
+    paginas: int  # O campo que o usuário vai enviar no JSON    
 
 
 @app.post("/livros/", status_code=status.HTTP_200_OK) # O create do CRUD
@@ -121,6 +121,7 @@ def deletar_livros(livro_id: int):
 
 @app.patch("/livros/{livro_id}")
 def atualizar_livros(livro_id: int, qtd_pagina: AtualizarPaginas):
+
     commandSQL: str = """
     UPDATE livros
     SET paginas = ?
@@ -143,4 +144,33 @@ def atualizar_livros(livro_id: int, qtd_pagina: AtualizarPaginas):
         "mensagem": "Livro atualizado com todo o sucesso do mundo!",
         "id_livro_atualizado": livro_id,
         "quantidade_de_paginas": qtd_pagina.paginas
+    }
+
+
+
+@app.put("/livros/{livro_id}")
+def mudar_livros(livro_id: int, livro_novo: Livro):
+    
+    commandSQL: str = """
+    UPDATE livros
+    SET titulo = ?, autor = ?, paginas = ?
+    WHERE id = ?;
+"""
+
+    dados: tuple[str, str, int, int] = (livro_novo.titulo, livro_novo.autor, livro_novo.paginas, livro_id)
+
+    connection = sqlite3.connect("biblioteca.db")
+    cursor = connection.cursor()
+
+    cursor.execute(commandSQL, dados)
+
+    connection.commit()
+
+    cursor.close()
+    connection.close()
+
+    return {
+        "mensagem": "Livro mudado com todo sucesso do mundo!",
+        "livro_id": livro_id,
+        "livro_novo": livro_novo
     }
