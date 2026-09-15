@@ -49,6 +49,7 @@ class SongSchema(BaseModel):
 
 app = FastAPI()
 
+# Endpoints da música em si
 
 # Verbo POST para adicionar músicas
 @app.post("/songs/", status_code=status.HTTP_201_CREATED)
@@ -114,4 +115,70 @@ def add_song(song: SongSchema):
         if connection:
             connection.close()
 
+@app.get("/songs/{song_id}", status_code= status.HTTP_200_OK)
+def get_song_by_id(song_id: int):
 
+    # Declara as variáveis antes do try
+    connection = None
+    cursor = None
+
+    try: # Final Bom
+
+        # Abre conexão
+        connection = sqlite3.connect("songs.db")
+
+        # connection.row_factory é para o mapeamento de linha por nome de coluna
+        connection.row_factory = sqlite3.Row
+
+        cursor = connection.cursor()
+
+        # Definição dos dados
+        commandSQL: str = """SELECT * FROM songs WHERE id = ?"""
+        dados: tuple[int] = (song_id,)
+
+        # Executa comandos
+        cursor.execute(commandSQL, dados)
+
+        # Obtém o resultado em uma lista
+        obtained_song: tuple | None = cursor.fetchone()
+
+        # Verificação da lista: se não existe (None)
+        if obtained_song is None:
+            raise HTTPException(
+                status_code= status.HTTP_404_NOT_FOUND,
+                detail= "Erro de requisição: A música não existe!"
+            )
+
+        return {
+            "status": "sucesso!",
+            "mensagem": dict(obtained_song)
+        }
+
+    except sqlite3.Error as e:
+        if connection:
+            connection.rollback()
+
+        raise HTTPException(
+            status_code= status.HTTP_400_BAD_REQUEST,
+            detail= f"Erro de Requisição: {str(e)}",
+        )
+
+    except Exception as e:
+        if connection:
+            connection.rollback()
+
+        raise HTTPException(
+            status_code= status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail= f"Erro Interno {str(e)}",
+        )
+
+
+    finally: # Inevitável
+
+        # Fecha o cursor
+        if cursor:
+            cursor.close()
+
+        # Fecha a conexão
+        if connection:
+            connection.close()
