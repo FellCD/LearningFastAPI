@@ -93,32 +93,6 @@ def obter_livros():
         "dados": livros_obtidos
 }
 
-@app.get("/livros/{livro_id}", status_code=status.HTTP_200_OK)
-def obter_livro_especifico(livro_id: int):
-    commandSQL = "SELECT * FROM livros WHERE id = ?;"
-    dados = (livro_id,)
-    mensagem = f"O livro do id {livro_id} foi acessado com todo o sucesso do mundo!"
-        
-    # Abre conexão
-    connection = sqlite3.connect("biblioteca.db")
-    
-    # Cria o cursor
-    cursor = connection.cursor()
-    
-    # Executa o comando
-    cursor.execute(commandSQL, dados)
-    
-    # Guarda resultado em uma variável
-    livros_obtido: list = cursor.fetchone()
-    
-    # Fecha o cursor e conexão
-    cursor.close()
-    connection.close()
-
-    return {
-        "mensagem": mensagem,
-        "dados": livros_obtido
-}
 
 @app.delete("/livros/{livro_id}") # O delete do CRUD
 def deletar_livros(livro_id: int):
