@@ -2,9 +2,13 @@
 
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
+from pathlib import Path
 import sqlite3
 
-connection = sqlite3.connect("songs.db")
+# Pega o diretório onde este arquivo .py está localizado e aponta para o songs.db nele
+DB_PATH = Path(__file__).parent / "songs.db"
+
+connection = sqlite3.connect(DB_PATH)
 cursor = connection.cursor()
 
 # Criação da tabela "songs": id(pkey int), name(text), duration_second(int) 
@@ -78,7 +82,7 @@ def add_song(song: SongSchema):
         dados: tuple[str, str, int] = (song.name, song.author, seconds_total)
 
         # Abre conexão
-        connection = sqlite3.connect("songs.db")
+        connection = sqlite3.connect(DB_PATH)
         cursor = connection.cursor()
 
         # Executa comandos
@@ -136,7 +140,7 @@ def get_song_by_id(song_id: int):
     try: # Final Bom
 
         # Abre conexão
-        connection = sqlite3.connect("songs.db")
+        connection = sqlite3.connect(DB_PATH)
 
         # connection.row_factory é para o mapeamento de linha por nome de coluna
         connection.row_factory = sqlite3.Row
@@ -207,7 +211,7 @@ def delete_song_by_id(song_id: int):
 
     # Final Bom
     try:
-        connection = sqlite3.connect("songs.db")
+        connection = sqlite3.connect(DB_PATH)
         cursor = connection.cursor()
 
         commandSQL: str = """DELETE FROM songs WHERE id = ?"""
@@ -282,7 +286,7 @@ def update_song_by_id(song_id: int, newSong: UpdateSongSchema):
 
     # Final Bom
     try:
-        connection = sqlite3.connect("songs.db")
+        connection = sqlite3.connect(DB_PATH)
         cursor = connection.cursor()
 
         clausulas_set: list = []
@@ -371,10 +375,10 @@ def add_playlist(playlist: PlaylistCreate):
 
     try:
         
-        conn = sqlite3.connect("songs.db")
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
-        commandSQL: str = """INSERT INTO playlists (name) VALUES (?);"""
+        commandSQL: str = """INSERT INTO playlists (playlist_name) VALUES (?);"""
         dados: tuple[str] = (playlist.name,)
 
         cursor.execute(commandSQL, dados)
