@@ -359,3 +359,60 @@ def update_song_by_id(song_id: int, newSong: UpdateSongSchema):
 
         if connection:
             connection.close()
+
+# Schemas de Playlist
+class PlaylistCreate(BaseModel):
+    name: str
+
+@app.post("/playlists/", status_code=status.HTTP_201_CREATED)
+def add_playlist(playlist: PlaylistCreate):
+    conn = None
+    cursor = None
+
+    try:
+        
+        conn = sqlite3.connect("songs.db")
+        cursor = conn.cursor()
+
+        commandSQL: str = """INSERT INTO playlists (name) VALUES (?);"""
+        dados: tuple[str] = (playlist.name,)
+
+        cursor.execute(commandSQL, dados)
+        playlist_id = cursor.lastrowid
+
+        conn.commit()
+
+        return {
+            "status": "Sucesso!",
+            "mensagem": f"A playlist {playlist.name} foi criada com todo o sucesso do mundo!",
+            "dados": {
+                "id": playlist_id,
+                "name": playlist.name
+            }
+        }
+
+    except sqlite3.Error as e:
+        if conn:
+            conn.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro Interno: {str(e)}",
+        )
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro Interno: {str(e)}",
+        )
+
+
+    finally:
+        if cursor:
+            cursor.close()
+        
+        if conn:
+            conn.close()
