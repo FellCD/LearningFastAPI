@@ -537,3 +537,61 @@ def get_playlist_by_id(playlist_id: int):
 
         if conn:
             conn.close()
+
+@app.delete("/playlists/{playlist_id}", status_code=status.HTTP_200_OK)
+def delete_playlist_by_id(playlist_id: int):
+    conn = None
+    cursor = None
+
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        commandSQL: str = "DELETE FROM playlists WHERE id = ?;"
+        dados: tuple[int] = (playlist_id,)
+        cursor.execute(commandSQL, dados)
+
+        if cursor.rowcount == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail= "Playlist não encontrada!"
+             )
+
+        conn.commit()
+
+        return {
+            "status": "sucesso!",
+            "mensagem": f"playlist {playlist_id} foi deletada com todo o sucesso do mundo!"
+        }
+
+    except HTTPException:
+        if conn:
+            conn.rollback()
+        
+        raise
+
+    except sqlite3.Error as e:
+        if conn:
+            conn.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail= f"Erro Interno: {str(e)}",
+        )
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail= f"Erro Interno: {str(e)}"
+        )
+    
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
