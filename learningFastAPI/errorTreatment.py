@@ -420,3 +420,120 @@ def add_playlist(playlist: PlaylistCreate):
         
         if conn:
             conn.close()
+
+@app.get("/playlists/", status_code=status.HTTP_200_OK)
+def get_playlist():
+
+    conn = None
+    cursor = None
+
+    try:
+        # Liga a conexão
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row # connection.row_factory é para o mapeamento de linha por nome de coluna
+        cursor = conn.cursor()
+
+        commandSQL: str = "SELECT * FROM playlists;"
+
+        cursor.execute(commandSQL)
+        rows = cursor.fetchall() # Obtém todos os registros
+
+        playlist: list = [dict(row) for row in rows] # A coleção "playlist" converte os registros em formato Dict
+
+        # Mensagem estilizada caso não tenha registros
+        if not playlist:
+            return {
+                "status": "sucesso!",
+                "mensagem": "Não há playlists cadastradas!",
+                "dados": []
+            } 
+
+        return {
+            "status": "sucesso!",
+            "mensagem": "Playlists obtidas com todo o sucesso do mundo!",
+            "dados": playlist
+        }
+
+    except sqlite3.Error as e:
+        if conn:
+            conn.rollback()
+
+        raise HTTPException(
+                status_code= status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail= f"Erro Interno: {str(e)}",
+            )
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail= f"Erro Interno: {str(e)}",
+        )
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+@app.get("/playlists/{playlist_id}", status_code=status.HTTP_200_OK)
+def get_playlist_by_id(playlist_id: int):
+    conn = None
+    cursor = None
+
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        commandSQL: str = "SELECT * FROM playlists WHERE id = ?;"
+        dados: tuple[int] = (playlist_id,)
+        cursor.execute(commandSQL, dados)
+        obtained_playlist: tuple | None = cursor.fetchone()
+
+        if obtained_playlist is None:
+
+            raise HTTPException(
+                status_code= status.HTTP_404_NOT_FOUND,
+                detail= "Erro de requisição: A playlist não existe!"
+            )
+
+        return {
+            "status": "sucesso!",
+            "mensagem": "Playlist obtida com todo o sucesso do mundo!",
+            "dados": dict(obtained_playlist)
+        }
+
+    # Garante a integridade do erro 404 que estava no bloco do Try
+    except HTTPException:
+        raise # Retorna o erro especifico do Try para não ser sobrescrever o erro do Try (404 nesse caso)
+    
+
+    except sqlite3.Error as e:
+        if conn:
+            conn.rollback()
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail= f"Erro Interno: {str(e)}",
+        )
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        raise HTTPException(
+            status_code= status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail= f"Erro Interno: {str(e)}",
+        )
+
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
