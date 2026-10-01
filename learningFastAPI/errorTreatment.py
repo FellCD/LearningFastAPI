@@ -202,6 +202,61 @@ def get_song_by_id(song_id: int):
         if connection:
             connection.close()
 
+@app.get("/songs/", status_code=status.HTTP_200_OK)
+def get_song():
+    connection = None
+    cursor = None
+
+    try:
+        connection = sqlite3.connect(DB_PATH)
+        connection.row_factory = sqlite3.Row
+        cursor = connection.cursor()
+
+        commandSQL: str = "SELECT * FROM songs;"
+        cursor.execute(commandSQL)
+        rows: list = cursor.fetchall() # guarda valores em listas
+
+        songs = [dict(row) for row in rows]
+
+        # Mensagem estilizada caso não tenha registros
+        if not songs:
+            return {
+                "status": "sucesso!",
+                "mensagem": "Não há músicas cadastradas!",
+                "dados": []
+            }
+
+        return {
+            "status": "sucesso!",
+            "mensagem": "Músicas obtidas com todo o sucesso do mundo!",
+            "dados": songs
+            }
+
+    except sqlite3.Error as e:
+        if connection:
+            connection.rollback()
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro Interno: {str(e)}",
+        )
+
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro Interno: {str(e)}",
+        ) 
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if connection:
+            connection.close()
+
 # Endpoint do Verbo DELETE para deletar a música de acordo com seu ID
 @app.delete("/songs/{song_id}", status_code=status.HTTP_200_OK)
 def delete_song_by_id(song_id: int):
