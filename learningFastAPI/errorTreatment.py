@@ -31,12 +31,12 @@ cursor.execute("""
 
 # Criação da tabela "playlists_songs": id(pkey int), playlist_id(fkey - playlists(id)), song_id(fkey - songs(id))
 cursor.execute("""
-    CREATE TABLE IF NOT EXISTS playlists_songs(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        playlist_id INTEGER,
-        song_id INTEGER ,
-        FOREIGN KEY (playlist_id) REFERENCES playlists(id),
-        FOREIGN KEY (song_id) REFERENCES songs(id)
+    CREATE TABLE IF NOT EXISTS playlists_songs (
+    playlist_id INTEGER NOT NULL,
+    song_id INTEGER NOT NULL,
+    PRIMARY KEY (playlist_id, song_id),
+    FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
+    FOREIGN KEY (song_id) REFERENCES songs(id) ON DELETE CASCADE
     );
 """)
 
@@ -729,3 +729,86 @@ def update_playlist_by_id(playlist_id: int, newPlaylist: PlaylistUpdate):
 
         if conn:
             conn.close()
+
+# Ponte entre playlists (tabela pai) e songs (tabela filho)
+
+@app.post("/playlists/{playlist_id}/songs/{song_id}", status_code=status.HTTP_201_CREATED)
+def add_song_to_playlist(playlist_id: int, song_id: int):
+    connector = None
+    cursor = None
+
+    try:
+        connector = sqlite3.connect(DB_PATH)
+        connector.execute("PRAGMA foreign_keys = ON;")
+        cursor = connector.cursor()
+
+        commandSQL: str = "SELECT id FROM playlists WHERE id = ?;"
+        dados: list[int] = [playlist_id]
+        cursor.execute(commandSQL, dados)
+
+        if not cursor.fetchone():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Playlist {playlist_id} não foi encontrada!",
+            )
+
+        commandSQL: str = "SELECT id FROM songs WHERE id = ?;"
+        dados: list[int] = [song_id]
+        cursor.execute(commandSQL, dados)
+
+        if not cursor.fetchone():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Música {song_id} não foi encontrada!",
+            )
+
+        commandSQL: str = "INSERT INTO playlists_songs (playlist_id, song_id) VALUES(?, ?);"
+        dados: list = [playlist_id, song_id]
+        cursor.execute(commandSQL, dados)
+
+        connector.commit()
+
+        return {
+            "status": "sucesso!",
+            "mensagem": f"Música {song_id} foi adicionada à playlist {playlist_id}!"
+        }
+
+    except sqlite3.IntegrityError as e:
+        if connector:
+            connector.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Música ja está registrada na playlist: {str(e)}",
+        )
+
+    except HTTPException:
+        if connector:
+            connector.rollback()
+
+        raise
+
+    except sqlite3.Error as e:
+        if connector:
+            connector.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro Interno: {str(e)}",
+        )
+
+    except Exception as e:
+        if connector:
+            connector.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro Interno: {str(e)}",
+        )
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if connector:
+            connector.close()
