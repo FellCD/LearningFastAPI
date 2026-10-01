@@ -21,7 +21,7 @@ cursor.execute("""
     );
 """)
 
-# Criação da tabela "playlists": id(pkey int), name(text)
+# Criação da tabela "playlists": id(pkey int), playlist_name(text)
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS playlists(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -366,7 +366,10 @@ def update_song_by_id(song_id: int, newSong: UpdateSongSchema):
 
 # Schemas de Playlist
 class PlaylistCreate(BaseModel):
-    name: str
+    playlist_name: str
+
+class PlaylistUpdate(BaseModel):
+    playlist_name: str | None
 
 @app.post("/playlists/", status_code=status.HTTP_201_CREATED)
 def add_playlist(playlist: PlaylistCreate):
@@ -379,7 +382,7 @@ def add_playlist(playlist: PlaylistCreate):
         cursor = conn.cursor()
 
         commandSQL: str = """INSERT INTO playlists (playlist_name) VALUES (?);"""
-        dados: tuple[str] = (playlist.name,)
+        dados: tuple[str] = (playlist.playlist_name,)
 
         cursor.execute(commandSQL, dados)
         playlist_id = cursor.lastrowid
@@ -388,10 +391,10 @@ def add_playlist(playlist: PlaylistCreate):
 
         return {
             "status": "Sucesso!",
-            "mensagem": f"A playlist {playlist.name} foi criada com todo o sucesso do mundo!",
+            "mensagem": f"A playlist {playlist.playlist_name} foi criada com todo o sucesso do mundo!",
             "dados": {
                 "id": playlist_id,
-                "name": playlist.name
+                "name": playlist.playlist_name
             }
         }
 
@@ -589,6 +592,82 @@ def delete_playlist_by_id(playlist_id: int):
             detail= f"Erro Interno: {str(e)}"
         )
     
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+@app.patch("/playlists/{playlist_id}", status_code=status.HTTP_200_OK)
+def update_playlist_by_id(playlist_id: int, newPlaylist: PlaylistUpdate):
+    conn = None
+    cursor = None
+
+    dados_enviados: dict = newPlaylist.model_dump(exclude_unset=True)
+
+    if not dados_enviados:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nenhum dado fornecido!",
+        )
+
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+
+        clausulas_set: list = []
+        valores: list = []
+
+        for k, v in dados_enviados.items():
+            if k == "playlist_name":
+                clausulas_set.append(f"{k} = ?")
+                valores.append(v)
+
+        valores.append(playlist_id)
+
+        commandSQL: str = f"UPDATE playlists SET {', '.join(clausulas_set)} WHERE id = ?"
+                
+        cursor.execute(commandSQL, tuple(valores))
+
+        if cursor.rowcount == 0:
+
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail= f"A playlist {playlist_id} não existe!",
+            )
+
+        conn.commit()
+
+        return {
+            "status": "sucesso!",
+            "mensagem": "Playlist atualizada com todo sucesso do mundo!"
+        }
+    
+    except HTTPException:
+        if conn:
+            conn.rollback()
+        
+        raise # HTTP 404
+
+    except sqlite3.Error as e:
+        if conn:
+            conn.rollback()
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro Interno: {str(e)}",
+        )
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro Interno: {str(e)}",
+        )
+
     finally:
         if cursor:
             cursor.close()
