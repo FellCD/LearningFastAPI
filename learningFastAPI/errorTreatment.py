@@ -419,6 +419,8 @@ def update_song_by_id(song_id: int, newSong: UpdateSongSchema):
         if connection:
             connection.close()
 
+
+
 # Schemas de Playlist
 class PlaylistCreate(BaseModel):
     playlist_name: str
@@ -730,6 +732,8 @@ def update_playlist_by_id(playlist_id: int, newPlaylist: PlaylistUpdate):
         if conn:
             conn.close()
 
+
+
 # Ponte entre playlists (tabela pai) e songs (tabela filho)
 
 @app.post("/playlists/{playlist_id}/songs/{song_id}", status_code=status.HTTP_201_CREATED)
@@ -861,6 +865,67 @@ def get_playlist_songs(playlist_id: int):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro Interno: {str(e)}",
+        )
+
+    except Exception as e:
+        if connector:
+            connector.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro Interno: {str(e)}",
+        )
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if connector:
+            connector.close()
+
+@app.delete("/playlists/{playlist_id}/songs/{song_id}", status_code=status.HTTP_200_OK)
+def delete_playlist_songs(playlist_id: int, song_id: int):
+    connector = None
+    cursor = None
+
+    try:
+        connector = sqlite3.connect(DB_PATH)
+        connector.execute("PRAGMA foreign_keys = ON;")
+        cursor = connector.cursor()
+
+        commandSQL: str = "SELECT 1 FROM playlists_songs WHERE playlist_id = ? AND song_id = ?;"
+        dados: tuple[int, int] = (playlist_id, song_id)
+        cursor.execute(commandSQL, dados)
+        association: tuple = cursor.fetchone()
+
+        if not association:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Não foi encontrada relação com a música {song_id} com a playlist {playlist_id}",
+            )
+
+        commandSQL: str = "DELETE FROM playlists_songs WHERE playlist_id = ? AND song_id = ?"
+        cursor.execute(commandSQL, dados)
+        connector.commit()
+
+        return {
+            "status": "sucesso!",
+            "mensagem": f"A relação entre a música {song_id} com a playlist {playlist_id} foi deletada com todo o sucesso do mundo!"
+        } 
+
+    except HTTPException:
+        if connector:
+            connector.rollback()
+
+        raise
+
+    except sqlite3.Error as e:
+        if connector:
+            connector.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro interno: {str(e)}",
         )
 
     except Exception as e:
