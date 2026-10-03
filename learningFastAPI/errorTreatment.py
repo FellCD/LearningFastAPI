@@ -11,7 +11,7 @@ DB_PATH = Path(__file__).parent / "songs.db"
 connection = sqlite3.connect(DB_PATH)
 cursor = connection.cursor()
 
-# Criação da tabela "songs": id(pkey int), name(text), duration_second(int) 
+# Criação da tabela "songs": id(pkey int), name(text), author(text), duration_second(int) 
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS songs(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -787,6 +787,72 @@ def add_song_to_playlist(playlist_id: int, song_id: int):
             connector.rollback()
 
         raise
+
+    except sqlite3.Error as e:
+        if connector:
+            connector.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro Interno: {str(e)}",
+        )
+
+    except Exception as e:
+        if connector:
+            connector.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro Interno: {str(e)}",
+        )
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if connector:
+            connector.close()
+
+@app.get("/playlists/{playlist_id}/songs")
+def get_playlist_songs(playlist_id: int):
+    connector = None
+    cursor = None
+
+    try:
+        # Abrir conexão e permitir fkeys
+        connector = sqlite3.connect(DB_PATH)
+        connector.execute("PRAGMA foreign_keys = ON;")
+        cursor = connector.cursor()
+
+        # Dando select primeiro para checar existência
+        commandSQL: str = "SELECT * FROM playlists WHERE id = ?;"
+        dados: tuple[int] = (playlist_id,)
+        cursor.execute(commandSQL, dados)
+        playlist: tuple = cursor.fetchone()
+
+        # if not pega qualquer valor falso
+        if not playlist:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Playlist {playlist_id} não encontrada!",
+            )
+
+        # Cruzar informações com JOIN
+        commandSQL: str = "SELECT songs.id, songs.name, songs.author, songs.duration_second FROM songs INNER JOIN playlists_songs ON songs.id = playlists_songs.song_id WHERE playlists_songs.playlist_id = ?"
+        cursor.execute(commandSQL, dados)
+        rows: list = cursor.fetchall()
+        songs: list = [{"id": row[0], "name": row[1], "author": row[2], "duration_second": row[3]} for row in rows]
+
+        return {
+            "status": "sucesso!",
+            "dados": songs 
+        }
+
+    except HTTPException:
+        if connector:
+            connector.rollback()
+
+        raise # 404
 
     except sqlite3.Error as e:
         if connector:
