@@ -736,7 +736,7 @@ def update_playlist_by_id(playlist_id: int, newPlaylist: PlaylistUpdate):
 
 # Ponte entre playlists (tabela pai) e songs (tabela filho)
 
-@app.post("/playlists/{playlist_id}/songs/{song_id}", status_code=status.HTTP_201_CREATED)
+@app.post("/playlists-songs/{playlist_id}/songs/{song_id}", status_code=status.HTTP_201_CREATED)
 def add_song_to_playlist(playlist_id: int, song_id: int):
     connector = None
     cursor = None
@@ -817,7 +817,7 @@ def add_song_to_playlist(playlist_id: int, song_id: int):
         if connector:
             connector.close()
 
-@app.get("/playlists/{playlist_id}/songs")
+@app.get("/playlists-songs/{playlist_id}/songs")
 def get_playlist_songs(playlist_id: int):
     connector = None
     cursor = None
@@ -883,7 +883,7 @@ def get_playlist_songs(playlist_id: int):
         if connector:
             connector.close()
 
-@app.delete("/playlists/{playlist_id}/songs/{song_id}", status_code=status.HTTP_200_OK)
+@app.delete("/playlists-songs/{playlist_id}/songs/{song_id}", status_code=status.HTTP_200_OK)
 def delete_playlist_songs(playlist_id: int, song_id: int):
     connector = None
     cursor = None
@@ -926,6 +926,73 @@ def delete_playlist_songs(playlist_id: int, song_id: int):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro interno: {str(e)}",
+        )
+
+    except Exception as e:
+        if connector:
+            connector.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro Interno: {str(e)}",
+        )
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if connector:
+            connector.close()
+
+@app.get("/playlists-songs/{playlist_id}", status_code=status.HTTP_200_OK)
+def get_playlist_song_data(playlist_id: int):
+    connector = None
+    cursor = None
+
+    try:
+        connector = sqlite3.connect(DB_PATH)
+        connector.execute("PRAGMA foreign_keys = ON;")
+        cursor = connector.cursor()
+
+        commandSQL: str = "SELECT * FROM playlists WHERE id = ?;"
+        dados: tuple[int] = (playlist_id,)
+        cursor.execute(commandSQL, dados)
+        playlist: tuple = cursor.fetchone()
+
+        if not playlist:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Playlist {playlist_id} não foi encontrada!",
+            )
+
+        commandSQL: str = "SELECT songs.id, songs.name, songs.author, songs.duration_second FROM songs INNER JOIN playlists_songs ON songs.id = playlists_songs.song_id WHERE playlists_songs.playlist_id = ?;"
+        cursor.execute(commandSQL, dados)
+        rows: list = cursor.fetchall()
+        songs: list[dict] = [{"id": row[0], "name": row[1], "author": row[2], "duration_second": row[3]} for row in rows]
+
+        return {
+            "status": "sucesso!",
+            "mensagem": "Playlist e suas músicas obtidas com todo o sucesso do mundo!",
+            "dados":{
+                "id": playlist[0],
+                "name": playlist[1],
+                "songs": songs
+            }
+        }
+
+    except HTTPException:
+        if connector:
+            connector.rollback()
+
+        raise
+
+    except sqlite3.Error as e:
+        if connector:
+            connector.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro Interno: {str(e)}",
         )
 
     except Exception as e:
